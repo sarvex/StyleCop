@@ -84,23 +84,23 @@ namespace Microsoft.StyleCop.CSharp
         /// A regular expression to match a type reference included within a cref attribute.
         /// </summary>
         /// <remarks>
-        /// {0}: namespace
-        /// {1}: type name
-        /// {2}: generic parameters regex
-        /// {3}: number of generic parameters
+        /// {0}: namespace (A.B)
+        /// {1}: type name (like Foo or Foo.Bar without any generics on it)
+        /// {2}: typename with generic parameters regex already on it ( like Foo{A,B} or Foo{A,B}.Bar{C,D} )
+        /// {3}: typename with the number of generic parameters on it too (like Foo`3 or Foo`2.Bar`3)
         /// </remarks>
         private const string CrefRegex =
-            @"(?'see'<see\s+cref\s*=\s*"")?" + // Optionally matches '<see cref="'
-            @"(((({0})?{1})(?(see)({2})))" + // Matches 'type', or, if <see> tag is included, matches 'type&lt;T,S&gt;', 'type&lt;T,S>', or 'type{T,S}'
-                @"|" +
-                @"(?(see)T:(({0})?{1}){3}))" + // Matches T:type'N, only if <see> tag is included.
-            @"(?(see)(""\s*(/>|>[\w\s]*</see>)))"; // Optionally matches '"/>' or '">some text</see>'
+            @"(?'see'<see\s+cref\s*=\s*"")?" +      // Optionally matches '<see cref="'
+            @"(((({0})?(?(see)({2})|({1}))))" +     // Optional namespace and then  matches 'type', or, if <see> tag is included, matches 'type&lt;T,S&gt;', 'type&lt;T,S>', or 'type{T,S}'
+            @"|" +
+            @"(?(see)T:(({0})?{3})))" +             // Matches T:type'N, only if <see> tag is included.
+            @"(?(see)(""\s*(/>|>[\w\s]*</see>)))";  // Optionally matches '"/>' or '">some text</see>' if <see> tag is included.
 
         /// <summary>
-        /// A regular expression to match the generic parameters list for a type.
+        /// A regular expression to match the generic parameters list for a type. Needs the outer paranthesis as its inserted into other RegExs.
         /// </summary>
         private const string CrefGenericParamsRegex =
-            @"(\s*(<|&lt;)\s*{0}\s*(>|&gt;))|(\s*{{\s*{0}\s*}})";
+            @"((\s*(<|&lt;)\s*{0}\s*(>|&gt;))|(\s*{{\s*{0}\s*}}))";
 
         /// <summary>
         /// Various version of the @ character.
@@ -583,36 +583,161 @@ namespace Microsoft.StyleCop.CSharp
         {
             Param.AssertNotNull(type, "type");
 
-            // Determine whether the type is generic.
-            string typeName = type.Declaration.Name;
-            string[] genericParams = null;
-            string genericParametersRegex = null;
+            // We get the actual type name. For nested types this is A.B rather than just B.
+            string actualTypeName = GetActualClassName(type, false);
+            string[] typeNameParts = actualTypeName.Split('.');
 
-            int index = typeName.IndexOf('<');
-            if (index > 0)
+            StringBuilder actualTypeNameWithoutGenerics = new StringBuilder();
+            StringBuilder typeNameWithGenerics = new StringBuilder();
+
+            for (int i = 0; i < typeNameParts.Length; ++i)
             {
-                // Get the generic types from the type name.
-                genericParams = ExtractGenericParametersFromType(typeName, index);
-                if (genericParams != null && genericParams.Length > 0)
-                {
-                    genericParametersRegex = BuildGenericParametersRegex(genericParams);
-                }
+                typeNameWithGenerics.Append(BuildTypeNameStringWithGenerics(typeNameParts[i]));
+                actualTypeNameWithoutGenerics.Append(RemoveGenericsFromTypeName(typeNameParts[i]));
 
-                // Remove the generic brackets from the type name.
-                typeName = typeName.Substring(0, index);
+                if (i < typeNameParts.Length - 1)
+                {
+                    typeNameWithGenerics.Append(@"\.");
+                    actualTypeNameWithoutGenerics.Append(@"\.");
+                }
+            }
+
+            StringBuilder typeNameWithParamsNumber = new StringBuilder();
+            for (int i = 0; i < typeNameParts.Length; i++)
+            {
+                typeNameWithParamsNumber.Append(BuildTypeNameStringWithParamsNumber(typeNameParts[i]));
+
+                if (i < typeNameParts.Length - 1)
+                {
+                    typeNameWithParamsNumber.Append(@"\.");
+                }
             }
 
             // Also capture the fully qualified name of the type, without generic parameters included.
             string namespaceRegex = BuildNamespaceRegex(type);
 
             // Build the regex string to match all possible formats for the type name.
-            return string.Format(
-                CultureInfo.InvariantCulture,
-                CrefRegex,
-                namespaceRegex,
-                typeName,
-                genericParametersRegex == null ? string.Empty : genericParametersRegex,
-                genericParams == null ? string.Empty : "`" + genericParams.Length.ToString(CultureInfo.InvariantCulture));
+            return string.Format(CultureInfo.InvariantCulture, CrefRegex, namespaceRegex, actualTypeNameWithoutGenerics, typeNameWithGenerics, typeNameWithParamsNumber);
+        }
+        
+        /// <summary>
+        /// Gets the actual name of the class. If nested type returns A+B rather than only B.
+        /// </summary>
+        /// <param name="type">The type to get the correct class name for.</param>
+        /// <param name="showPlusInTypeName">True to show a '+' sign in a nested type.</param>
+        /// <returns>A string of the actual class name.</returns>
+        private static string GetActualClassName(ClassBase type, bool showPlusInTypeName)
+        {
+            Param.AssertNotNull(type, "type");
+            Param.Ignore(showPlusInTypeName);
+
+            CsElement localType = type;
+
+            while (localType.Parent is ClassBase)
+            {
+                localType = (CsElement)localType.Parent;
+            }
+
+            int lastIndexOfDot = localType.FullyQualifiedName.LastIndexOf('.');
+            if (lastIndexOfDot == -1)
+            {
+                return type.Name;
+            }
+            else
+            {
+                Debug.Assert(type.FullNamespaceName.Length > lastIndexOfDot + 1, "The fully qualified name is corrupted.");
+                string remainder = type.FullyQualifiedName.Substring(lastIndexOfDot + 1);
+                return showPlusInTypeName ? remainder.Replace('.', '+') : remainder;
+            }
+        }
+
+        /// <summary>
+        /// Gets the actual qualified namespace of the class. For nested types where A.B.C.D exists and C.D is the type it returns A.B rather than A.B.C.
+        /// </summary>
+        /// <param name="type">The type to get the namespace for.</param>
+        /// <returns>A string of the actual namespace.</returns>
+        private static string GetActualQualifiedNamespace(ClassBase type)
+        {
+            Param.AssertNotNull(type, "type");
+            
+            CsElement localType = type;
+            while (localType.Parent is ClassBase)
+            {
+                localType = (CsElement)localType.Parent;
+            }
+
+            string fullyQualifiedNameOfParentClass = localType.FullyQualifiedName;
+            int lastIndexOfDot = fullyQualifiedNameOfParentClass.LastIndexOf('.');
+
+            return lastIndexOfDot == -1 ? string.Empty : fullyQualifiedNameOfParentClass.Substring(0, lastIndexOfDot + 1);
+        }
+        
+        /// <summary>
+        /// Removes the generics from type name provided.
+        /// </summary>
+        /// <param name="typeName">Name of the type.</param>
+        /// <returns>A string of the type name without the generics at the end.</returns>
+        private static string RemoveGenericsFromTypeName(string typeName)
+        {
+            Param.AssertNotNull(typeName, "typeName");
+
+            // Determine whether the type is generic.
+            int index = typeName.IndexOf('<');
+            if (index > 0)
+            {
+                // Remove the generic brackets from the type name.
+                typeName = typeName.Substring(0, index);
+            }
+
+            return typeName;
+        }
+
+        /// <summary>
+        /// Builds the type name string with generics.
+        /// </summary>
+        /// <param name="typeName">Name of the type.</param>
+        /// <returns>A type name string with a regex to match generics as the suffix.</returns>
+        private static string BuildTypeNameStringWithGenerics(string typeName)
+        {
+            Param.AssertNotNull(typeName, "typeName");
+
+            // Determine whether the type is generic.
+            int index = typeName.IndexOf('<');
+            if (index < 0)
+            {
+                return typeName;
+            }
+
+            // Remove the generic brackets from the type name.
+            return string.Concat(
+                typeName.Substring(0, index),
+                BuildGenericParametersRegex(ExtractGenericParametersFromType(typeName, index)));
+        }
+        
+        /// <summary>
+        /// Builds the type name string with params number.
+        /// </summary>
+        /// <param name="typeName">Name of the type.</param>
+        /// <returns>A type name string with the numbers of generics as the suffix.</returns>
+        private static string BuildTypeNameStringWithParamsNumber(string typeName)
+        {
+            Param.AssertNotNull(typeName, "typeName");
+
+            // Determine whether the type is generic.
+            int index = typeName.IndexOf('<');
+            if (index < 0)
+            {
+                return typeName;
+            }
+
+            // Get the generic types from the type name.
+            string[] genericParams = ExtractGenericParametersFromType(typeName, index);
+
+            // Remove the generic brackets from the type name.
+            return string.Concat(
+                typeName.Substring(0, index),
+                "`",
+                genericParams.Length);
         }
 
         /// <summary>
@@ -625,41 +750,10 @@ namespace Microsoft.StyleCop.CSharp
             Param.AssertNotNull(type, "type");
 
             // The fully-qualified name of a type should always begin with Root. This part should be ignored.
-            string fullyQualifiedName = type.FullyQualifiedName;
-            Debug.Assert(fullyQualifiedName.StartsWith("Root.", StringComparison.Ordinal), "The fully qualified name of a type should start with Root.");
+            string actualQualifiedClassName = GetActualQualifiedNamespace(type);
+            Debug.Assert(actualQualifiedClassName.StartsWith("Root.", StringComparison.Ordinal), "The fully qualified name of a type should start with Root.");
 
-            StringBuilder namespaceRegex = new StringBuilder();
-
-            int start = 5;
-
-            // Start at position 5 to skip past the 'Root.' prefix.
-            for (int i = start; i < fullyQualifiedName.Length; ++i)
-            {
-                if (fullyQualifiedName[i] == '.')
-                {
-                    // Since a dot is a special character in regex syntax, we need to escape this character.
-                    if (namespaceRegex.Length > 0)
-                    {
-                        namespaceRegex.Append("\\.");
-                    }
-
-                    namespaceRegex.Append(fullyQualifiedName.Substring(start, i - start));
-
-                    start = i + 1;
-                }
-                else if (fullyQualifiedName[i] == '<')
-                {
-                    // Stop if we get to an opening generic bracket.
-                    break;
-                }
-            }
-
-            if (namespaceRegex.Length > 0)
-            {
-                namespaceRegex.Append("\\.");
-            }
-
-            return namespaceRegex.ToString();
+            return actualQualifiedClassName.Substring(5).Replace(".", "\\.");
         }
 
         /// <summary>
@@ -886,6 +980,51 @@ namespace Microsoft.StyleCop.CSharp
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Returns the net count of opening and closing code elements for the token provided.
+        /// </summary>
+        /// <param name="token">The xml header line token.</param>
+        /// <returns>The net count of open and close code elements.</returns>
+        private static int XmlHeaderLineCodeElementCount(CsToken token)
+        {
+            Param.AssertNotNull(token, "token");
+            Debug.Assert(token.CsTokenType == CsTokenType.XmlHeaderLine, "The token should be an xml header line");
+
+            string lineText = token.Text;
+
+            int openCodeTagCount = CountOfStringInStringOccurrences(lineText, "<code>");
+            int closeCodeTagCount = CountOfStringInStringOccurrences(lineText, "</code>");
+
+            return openCodeTagCount - closeCodeTagCount;
+        }
+
+        /// <summary>
+        /// Returns the count of occurences of stringToFind in the provided string.
+        /// </summary>
+        /// <param name="text">The text to search through.</param>
+        /// <param name="stringToFind">The string to count.</param>
+        /// <returns>The count of stringToFind in the text. If text or stringToFind are empty or null then return 0.</returns>
+        private static int CountOfStringInStringOccurrences(string text, string stringToFind)
+        {
+            Param.Ignore(text, stringToFind);
+
+            if (String.IsNullOrEmpty(text) || String.IsNullOrEmpty(stringToFind))
+            {
+                return 0;
+            }
+
+            int count = 0;
+            int i = 0;
+
+            while ((i = text.IndexOf(stringToFind, i)) != -1)
+            {
+                i += stringToFind.Length;
+                count++;
+            }
+
+            return count;
         }
 
         #endregion Private Static Methods
@@ -1163,70 +1302,116 @@ namespace Microsoft.StyleCop.CSharp
 
             if (rawDocs != null && formattedDocs != null)
             {
-                // Insert any documentation present in 'include' tags.
-                if (this.InsertIncludedDocumentation(element, Path.GetDirectoryName(element.Document.SourceCode.Path), formattedDocs))
+                // Check whether the method has an <inheritdoc> tag at the root. If so, discontinue checking the contents of the header, 
+                // but verify that the class actually inherits from a base class. Otherwise this tag is not allowed.
+                if (rawDocs.SelectSingleNode("root/inheritdoc") != null)
                 {
-                    this.CheckForBlankLinesInDocumentationHeader(element, header);
-                    this.CheckHeaderSummary(element, lineNumber, partialElement, formattedDocs);
+                    this.CheckInheritDocRules(element);
+                }
+                else
+                {
+                    // Insert any documentation present in 'include' tags.
+                    if (this.InsertIncludedDocumentation(element, Path.GetDirectoryName(element.Document.SourceCode.Path), formattedDocs))
+                    {
+                        this.CheckForBlankLinesInDocumentationHeader(element, header);
+                        this.CheckHeaderSummary(element, lineNumber, partialElement, formattedDocs);
 
-                    // Check element parameters and return types.
-                    if (element.ElementType == ElementType.Method)
-                    {
-                        Method item = element as Method;
-                        this.CheckHeaderParams(element, item.Parameters, formattedDocs);
-                        this.CheckHeaderReturnValue(element, item.ReturnType, formattedDocs);
-                    }
-                    else if (element.ElementType == ElementType.Constructor)
-                    {
-                        Constructor item = element as Constructor;
-                        this.CheckHeaderParams(element, item.Parameters, formattedDocs);
-                        this.CheckConstructorSummaryText(item, formattedDocs);
-                    }
-                    else if (element.ElementType == ElementType.Delegate)
-                    {
-                        Microsoft.StyleCop.CSharp.Delegate item = element as Microsoft.StyleCop.CSharp.Delegate;
-                        this.CheckHeaderParams(element, item.Parameters, formattedDocs);
-                        this.CheckHeaderReturnValue(element, item.ReturnType, formattedDocs);
-                    }
-                    else if (element.ElementType == ElementType.Indexer)
-                    {
-                        Indexer item = element as Indexer;
-                        this.CheckHeaderParams(element, item.Parameters, formattedDocs);
-                    }
-                    else if (element.ElementType == ElementType.Property)
-                    {
-                        // Check value tags on properties.
-                        this.CheckPropertyValueTag(element, formattedDocs);
+                        // Check element parameters and return types.
+                        if (element.ElementType == ElementType.Method)
+                        {
+                            Method item = element as Method;
+                            this.CheckHeaderParams(element, item.Parameters, formattedDocs);
+                            this.CheckHeaderReturnValue(element, item.ReturnType, formattedDocs);
+                        }
+                        else if (element.ElementType == ElementType.Constructor)
+                        {
+                            Constructor item = element as Constructor;
+                            this.CheckHeaderParams(element, item.Parameters, formattedDocs);
+                            this.CheckConstructorSummaryText(item, formattedDocs);
+                        }
+                        else if (element.ElementType == ElementType.Delegate)
+                        {
+                            Microsoft.StyleCop.CSharp.Delegate item = element as Microsoft.StyleCop.CSharp.Delegate;
+                            this.CheckHeaderParams(element, item.Parameters, formattedDocs);
+                            this.CheckHeaderReturnValue(element, item.ReturnType, formattedDocs);
+                        }
+                        else if (element.ElementType == ElementType.Indexer)
+                        {
+                            Indexer item = element as Indexer;
+                            this.CheckHeaderParams(element, item.Parameters, formattedDocs);
+                        }
+                        else if (element.ElementType == ElementType.Property)
+                        {
+                            // Check value tags on properties.
+                            this.CheckPropertyValueTag(element, formattedDocs);
 
-                        // Check that the property summary starts with the correct text.
-                        this.CheckPropertySummaryFormatting(element as Property, formattedDocs);
-                    }
-                    else if (element.ElementType == ElementType.Destructor)
-                    {
-                        this.CheckDestructorSummaryText((Destructor)element, formattedDocs);
-                    }
+                            // Check that the property summary starts with the correct text.
+                            this.CheckPropertySummaryFormatting(element as Property, formattedDocs);
+                        }
+                        else if (element.ElementType == ElementType.Destructor)
+                        {
+                            this.CheckDestructorSummaryText((Destructor)element, formattedDocs);
+                        }
 
-                    // Check for repeating comments on all element types which can contain params or typeparams.
-                    if (element.ElementType == ElementType.Method ||
-                        element.ElementType == ElementType.Constructor ||
-                        element.ElementType == ElementType.Delegate ||
-                        element.ElementType == ElementType.Indexer ||
-                        element.ElementType == ElementType.Class ||
-                        element.ElementType == ElementType.Struct ||
-                        element.ElementType == ElementType.Interface)
-                    {
-                        this.CheckForRepeatingComments(element, formattedDocs);
-                    }
+                        // Check for repeating comments on all element types which can contain params or typeparams.
+                        if (element.ElementType == ElementType.Method ||
+                            element.ElementType == ElementType.Constructor ||
+                            element.ElementType == ElementType.Delegate ||
+                            element.ElementType == ElementType.Indexer ||
+                            element.ElementType == ElementType.Class ||
+                            element.ElementType == ElementType.Struct ||
+                            element.ElementType == ElementType.Interface)
+                        {
+                            this.CheckForRepeatingComments(element, formattedDocs);
+                        }
 
-                    // Check generic type parameters.
-                    if (element.ElementType == ElementType.Class ||
-                        element.ElementType == ElementType.Method ||
-                        element.ElementType == ElementType.Delegate ||
-                        element.ElementType == ElementType.Interface ||
-                        element.ElementType == ElementType.Struct)
-                    {
-                        this.CheckGenericTypeParams(element, formattedDocs);
+                        // Check generic type parameters.
+                        if (element.ElementType == ElementType.Class ||
+                            element.ElementType == ElementType.Method ||
+                            element.ElementType == ElementType.Delegate ||
+                            element.ElementType == ElementType.Interface ||
+                            element.ElementType == ElementType.Struct)
+                        {
+                            this.CheckGenericTypeParams(element, formattedDocs);
+                        }
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Checks the given element which contains an inheritdoc tag in the header.
+        /// </summary>
+        /// <param name="element">The element to check.</param>
+        private void CheckInheritDocRules(CsElement element)
+        {
+            Param.AssertNotNull(element, "element");
+
+            if (element.ElementType == ElementType.Class)
+            {
+                if (string.IsNullOrEmpty(((Class)element).BaseClass))
+                {
+                    this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
+                }
+            }
+            else if (element.ElementType == ElementType.Interface)
+            {
+                if (((Interface)element).ImplementedInterfaces.Count == 0)
+                {
+                    this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
+                }
+            }
+            else if (element.ElementType == ElementType.Struct)
+            {
+                this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
+            }
+            else
+            {
+                // Find the parent class.
+                ClassBase parentClass = element.Parent as ClassBase;
+                if (parentClass == null || parentClass.ElementType != ElementType.Class || string.IsNullOrEmpty(parentClass.BaseClass))
+                {
+                    this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
                 }
             }
         }
@@ -1351,6 +1536,8 @@ namespace Microsoft.StyleCop.CSharp
             if (!element.Generated)
             {
                 int blankLineCount = 0;
+                int insideCodeElementCount = 0;
+
                 for (Node<CsToken> tokenNode = header.ChildTokens.First; tokenNode != null && tokenNode != header.ChildTokens.Last.Next; tokenNode = tokenNode.Next)
                 {
                     CsToken token = tokenNode.Value;
@@ -1367,15 +1554,17 @@ namespace Microsoft.StyleCop.CSharp
                     }
                     else if (token.CsTokenType == CsTokenType.XmlHeaderLine)
                     {
+                        insideCodeElementCount += XmlHeaderLineCodeElementCount(token);
+
                         if (tokenNode == header.ChildTokens.First || tokenNode == header.ChildTokens.Last)
                         {
-                            if (IsXmlHeaderLineEmpty(token))
+                            if (IsXmlHeaderLineEmpty(token) && insideCodeElementCount == 0)
                             {
                                 this.AddViolation(element, token.LineNumber, Rules.DocumentationHeadersMustNotContainBlankLines);
                                 break;
                             }
                         }
-                        else if (!IsXmlHeaderLineEmpty(token))
+                        else if (!IsXmlHeaderLineEmpty(token) || insideCodeElementCount > 0)
                         {
                             blankLineCount = 0;
                         }
@@ -1409,21 +1598,22 @@ namespace Microsoft.StyleCop.CSharp
             {
                 this.AddViolation(element, lineNumber, Rules.DocumentationTextMustEndWithAPeriod, documentationType);
             }
-            
+
             if ((commentType & InvalidCommentType.NoCapitalLetter) != 0)
             {
-                // If the return value documentation starts with "true" or "false", then
-                // don't check that the comment starts with a capital letter, because we want to
-                // allow this. For example, it is common to write return documentation such as:
-                // "true if the method succeeds; false otherwise."
-                if (!documentationType.Equals("return", StringComparison.Ordinal) ||
-                    (!documentationXml.InnerText.StartsWith("true", StringComparison.Ordinal) &&
-                     !documentationXml.InnerText.StartsWith("false", StringComparison.Ordinal)))
+                // Allow documentation to begin with <c> or <paramref> and not a capital letter
+                // Or
+                // begin with true or false (in a <return> element)
+                // Code like this is common:
+                // <value><c>true</c> if dirty; otherwise, <c>false</c>.</value>
+                if ((!documentationXml.InnerXml.StartsWith("<c>", StringComparison.Ordinal) && !documentationXml.InnerXml.StartsWith("<paramref", StringComparison.Ordinal)) &&
+                    (!documentationType.Equals("return", StringComparison.Ordinal) ||
+                     (!documentationXml.InnerText.StartsWith("true", StringComparison.Ordinal) && !documentationXml.InnerText.StartsWith("false", StringComparison.Ordinal))))
                 {
                     this.AddViolation(element, lineNumber, Rules.DocumentationTextMustBeginWithACapitalLetter, documentationType);
                 }
             }
-            
+
             if ((commentType & InvalidCommentType.NoWhitespace) != 0)
             {
                 this.AddViolation(element, lineNumber, Rules.DocumentationTextMustContainWhitespace, documentationType);
