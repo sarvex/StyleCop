@@ -605,6 +605,9 @@
       <Violation Section="Root.CSharpAnalyzersTest.TestData.DocumentationProperties.InvalidProperty32" LineNumber="380" Rule="PropertyDocumentationMustHaveValue" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.DocumentationProperties.InvalidProperty32" LineNumber="380" Rule="PropertySummaryDocumentationMustOmitSetAccessorWithRestrictedAccess" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.DocumentationProperties.InvalidProperty33" LineNumber="391" Rule="PropertySummaryDocumentationMustMatchAccessors" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.DocumentationProperties2.InvalidProperty1" LineNumber="485" Rule="DocumentationTextMustBeginWithACapitalLetter" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.DocumentationProperties2.InvalidProperty2" LineNumber="494" Rule="DocumentationTextMustBeginWithACapitalLetter" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.DocumentationProperties2.InvalidProperty3" LineNumber="503" Rule="DocumentationTextMustBeginWithACapitalLetter" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.InvalidDocumentationStruct1" LineNumber="125" Rule="ElementDocumentationMustNotHaveDefaultSummary" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.InvalidDocumentationStruct2" LineNumber="132" Rule="DocumentationMustContainValidXml" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.InvalidDocumentationStruct3" LineNumber="136" Rule="ElementsMustBeDocumented" />
@@ -1885,7 +1888,8 @@
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Class2.Class2" LineNumber="155" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Class2.Class2" LineNumber="162" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Class2.Class2" LineNumber="169" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
-
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.NestedClassesConstructorSummary.Class5.Class5" LineNumber="339" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.NestedClassesConstructorSummary.Class5.Class6.Class6" LineNumber="349" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.SimpleClass.SimpleClass" LineNumber="12" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.SimpleClassWithCref.SimpleClassWithCref" LineNumber="22" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.SimpleClassWithCrefAndFalseGenerics1.SimpleClassWithCrefAndFalseGenerics1" LineNumber="32" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
@@ -1929,6 +1933,9 @@
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.MultiGenericClassCrefWithHardcodedRef`T`S`R.MultiGenericClassCrefWithHardcodedRef" LineNumber="392" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.MultiGenericClassCrefWithHardcodedRefAndNamespace`T`S`R.MultiGenericClassCrefWithHardcodedRefAndNamespace" LineNumber="402" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.MultiGenericClassCrefWithHardcodedRefAndMultiCharParams`TItem`S`RItem.MultiGenericClassCrefWithHardcodedRefAndMultiCharParams" LineNumber="412" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.NestedMultiGenericClassCrefWithltgtAndNamespace`T`S`R.NestedMultiGenericClassCrefWithltgtAndNamespaceClass2`D`E`F.NestedMultiGenericClassCrefWithltgtAndNamespaceClass2" LineNumber="424" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.NestedMultiGenericClassCrefWithltgtAndNamespace`T`S`R.NestedMultiGenericClassCrefWithltgtAndNamespaceClass3`G`H.NestedMultiGenericClassCrefWithltgtAndNamespaceClass3" LineNumber="434" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.Violations.NestedMultiGenericClassCrefWithltgtAndNamespace`T`S`R.NestedMultiGenericClassCrefWithltgtAndNamespaceClass3`G`H.NestedMultiGenericClassCrefWithltgtAndNamespaceClass3%int" LineNumber="441" Rule="ConstructorSummaryDocumentationMustBeginWithStandardText" />
     </ExpectedViolations>
   </Test>
 
@@ -1976,6 +1983,16 @@
             </Rule>
           </Rules>
         </Analyzer>
+        <Analyzer AnalyzerId="Microsoft.StyleCop.CSharp.LayoutRules">
+          <Rules>
+            <Rule Name="CodeMustNotContainMultipleBlankLinesInARow">
+              <!-- This rule is enabled here to ensure that it does not fire within the code sections of these headers. -->
+              <RuleSettings>
+                <BooleanProperty Name="Enabled">True</BooleanProperty>
+              </RuleSettings>
+            </Rule>
+          </Rules>
+        </Analyzer>
       </Analyzers>
     </Settings>
     <ExpectedViolations>
@@ -1985,7 +2002,9 @@
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Class5" LineNumber="37" Rule="DocumentationHeadersMustNotContainBlankLines" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Class6" LineNumber="42" Rule="DocumentationHeadersMustNotContainBlankLines" />
       <Violation Section="Root.CSharpAnalyzersTest.TestData.Class7" LineNumber="52" Rule="DocumentationHeadersMustNotContainBlankLines" />
-      <Violation Section="Root.CSharpAnalyzersTest.TestData.Class8" LineNumber="61" Rule="DocumentationHeadersMustNotContainBlankLines" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.Class8" LineNumber="61" Rule="DocumentationHeadersMustNotContainBlankLines" />    
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.Class10" LineNumber="111" Rule="DocumentationHeadersMustNotContainBlankLines" />
+      <Violation Section="Root.CSharpAnalyzersTest.TestData.Class14" LineNumber="243" Rule="DocumentationHeadersMustNotContainBlankLines" />
     </ExpectedViolations>
   </Test>
 
@@ -3004,6 +3023,44 @@
       <Violation Section="Root.InternalPrivatePrivateProtected.Class1e.Class2.Class3.Hello" LineNumber="3065" Rule="PropertySummaryDocumentationMustOmitSetAccessorWithRestrictedAccess" />
       <Violation Section="Root.InternalPrivatePrivateProtectedInternal.Class1e.Class2.Class3.Hello" LineNumber="3081" Rule="PropertySummaryDocumentationMustOmitSetAccessorWithRestrictedAccess" />
       <Violation Section="Root.InternalPrivatePrivateInternal.Class1e.Class2.Class3.Hello" LineNumber="3091" Rule="PropertySummaryDocumentationMustOmitSetAccessorWithRestrictedAccess" />
+    </ExpectedViolations>
+  </Test>
+
+  <Test Name="DocumentationInheritdoc">
+    <TestCodeFile>DocumentationInheritdoc.cs</TestCodeFile>
+    <Settings>
+      <GlobalSettings>
+        <StringProperty Name="MergeSettingsFiles">NoMerge</StringProperty>
+        <BooleanProperty Name="RulesEnabledByDefault">False</BooleanProperty>
+      </GlobalSettings>
+      <Analyzers>
+        <Analyzer AnalyzerId="Microsoft.StyleCop.CSharp.DocumentationRules">
+          <AnalyzerSettings>
+            <BooleanProperty Name="IgnorePrivates">False</BooleanProperty>
+            <BooleanProperty Name="IgnoreInternals">False</BooleanProperty>
+          </AnalyzerSettings>
+          <Rules>
+            <Rule Name="InheritDocMustBeUsedWithInheritingClass">
+              <RuleSettings>
+                <BooleanProperty Name="Enabled">True</BooleanProperty>
+              </RuleSettings>
+            </Rule>
+          </Rules>
+        </Analyzer>
+      </Analyzers>
+    </Settings>
+    <ExpectedViolations>
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.Handler" LineNumber="37" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.Enum1" LineNumber="40" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.Enum2.Item" LineNumber="47" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc1" LineNumber="51" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc2" LineNumber="56" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc3" LineNumber="61" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc4.Method1" LineNumber="68" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc5.Method1" LineNumber="76" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc6.Method1" LineNumber="82" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc7.Method1" LineNumber="88" Rule="InheritDocMustBeUsedWithInheritingClass" />
+      <Violation Section="Root.CSharpAnalyzersTest.InvalidTestData.InvalidInheritDoc8.InternalClass.Method1" LineNumber="96" Rule="InheritDocMustBeUsedWithInheritingClass" />
     </ExpectedViolations>
   </Test>
 
