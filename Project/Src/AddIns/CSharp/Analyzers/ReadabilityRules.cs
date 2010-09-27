@@ -145,6 +145,33 @@ namespace Microsoft.StyleCop.CSharp
             return false;
         }
 
+        /// <summary>
+        /// Determines whether the node is part of a method parameter.
+        /// </summary>
+        /// <param name="node">The node to check to see if its part of a method parameter.</param>
+        /// <returns>Returns true if the node is part of a method parameter, false otherwise.</returns>
+        private static bool IsMethodParameterDeclaration(Node<CsToken> node)
+        {
+            Param.Ignore(node);
+
+            if (node != null && node.Value != null)
+            {
+                ICodePart parent = node.Value.Parent;
+
+                while (parent != null)
+                {
+                    if (parent.CodePartType == CodePartType.Parameter)
+                    {
+                        return true;
+                    }
+
+                    parent = parent.Parent;
+                }
+            }
+
+            return false;
+        }
+
         #endregion Private Static Methods
 
         #region Private Methods
@@ -200,9 +227,40 @@ namespace Microsoft.StyleCop.CSharp
                 {
                     this.CheckMethodInvocationParameters(parentElement, (MethodInvocationExpression)expression);
                 }
+                else if (expression.ExpressionType == ExpressionType.MemberAccess)
+                {
+                    this.CheckBuiltInTypeForMemberAccessExpressions(((MemberAccessExpression)expression).LeftHandSide.Tokens.First);
+                }
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Checks a type to determine whether it should use one of the built-in types.
+        /// </summary>
+        /// <param name="type">The type to check.</param>
+        private void CheckBuiltInTypeForMemberAccessExpressions(Node<CsToken> type)
+        {
+            Param.AssertNotNull(type, "type");
+
+            for (int i = 0; i < this.builtInTypes.Length; ++i)
+            {
+                string[] builtInType = this.builtInTypes[i];
+
+                if (CsTokenList.MatchTokens(type, builtInType[0]) ||
+                    CsTokenList.MatchTokens(type, "System", ".", builtInType[0]))
+                {
+                    this.AddViolation(
+                        type.Value.FindParentElement(),
+                        type.Value.LineNumber,
+                        Rules.UseBuiltInTypeAlias,
+                        builtInType[2],
+                        builtInType[0],
+                        builtInType[1]);
+                    break;
+                }
+            }
         }
 
         /// <summary>
@@ -223,6 +281,11 @@ namespace Microsoft.StyleCop.CSharp
                 {
                     // Check that the type is using the built-in types, if applicable.
                     this.CheckBuiltInType(tokenNode, document);
+
+                    if (token.CsTokenClass == CsTokenClass.GenericType)
+                    {
+                        this.CheckShorthandForNullableTypes(tokenNode);
+                    }
                 }
                 else if (token.CsTokenType == CsTokenType.String)
                 {
@@ -238,6 +301,23 @@ namespace Microsoft.StyleCop.CSharp
                         this.AddViolation(token.FindParentElement(), token.LineNumber, Rules.DoNotUseRegions);
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Checks the generic type uses the shorthand declaration format.
+        /// </summary>
+        /// <param name="type">The node to check.</param>
+        private void CheckShorthandForNullableTypes(Node<CsToken> type)
+        {
+            Param.AssertNotNull(type, "type");
+
+            Debug.Assert(type.Value.CsTokenClass == CsTokenClass.GenericType, "Expected a generic type.");
+            TypeToken typeToken = (TypeToken)type.Value;
+
+            if (typeToken.ChildTokens.Count > 0 && typeToken.ChildTokens.First.Value.Text.Equals("Nullable", StringComparison.Ordinal))
+            {
+                this.AddViolation(typeToken.FindParentElement(), typeToken.LineNumber, Rules.UseShorthandForNullableTypes);
             }
         }
 
@@ -323,7 +403,8 @@ namespace Microsoft.StyleCop.CSharp
                 string.Equals(@string.Text, "@\"\"", StringComparison.Ordinal))
             {
                 // Look at the previous non-whitespace token. If it is the 'case' keyword, then do not throw this
-                // exception. It is illegal to write case: String.Empty and instead case: "" must be written.
+                // exception. It is illegal to write case String.Empty : and instead case "": must be written.
+                // We also check that the node is not part of a method parameter as these must be "" also.
                 Node<CsToken> previousToken = null;
                 for (Node<CsToken> previousNode = stringNode.Previous; previousNode != null; previousNode = previousNode.Previous)
                 {
@@ -337,7 +418,7 @@ namespace Microsoft.StyleCop.CSharp
                     }
                 }
 
-                if (previousToken == null || (previousToken.Value.CsTokenType != CsTokenType.Case && !IsConstVariableDeclaration(previousToken)))
+                if (previousToken == null || (previousToken.Value.CsTokenType != CsTokenType.Case && !IsConstVariableDeclaration(previousToken) && !IsMethodParameterDeclaration(previousToken)))
                 {
                     this.AddViolation(@string.FindParentElement(), @string.LineNumber, Rules.UseStringEmptyForEmptyStrings);
                 }
