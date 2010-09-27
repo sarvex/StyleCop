@@ -97,7 +97,7 @@ namespace Microsoft.StyleCop.CSharp
             @"(?(see)(""\s*(/>|>[\w\s]*</see>)))";  // Optionally matches '"/>' or '">some text</see>' if <see> tag is included.
 
         /// <summary>
-        /// A regular expression to match the generic parameters list for a type. Needs the outer paranthesis as its inserted into other RegExs.
+        /// A regular expression to match the generic parameters list for a type. Needs the outer parenthesis as its inserted into other RegExs.
         /// </summary>
         private const string CrefGenericParamsRegex =
             @"((\s*(<|&lt;)\s*{0}\s*(>|&gt;))|(\s*{{\s*{0}\s*}}))";
@@ -1387,27 +1387,26 @@ namespace Microsoft.StyleCop.CSharp
 
             if (element.ElementType == ElementType.Class)
             {
-                if (string.IsNullOrEmpty(((Class)element).BaseClass))
+                Class c = (Class)element;
+                if (string.IsNullOrEmpty(c.BaseClass) && c.ImplementedInterfaces.Count == 0)
                 {
                     this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
                 }
             }
-            else if (element.ElementType == ElementType.Interface)
+            else if (element.ElementType == ElementType.Interface || element.ElementType == ElementType.Struct)
             {
-                if (((Interface)element).ImplementedInterfaces.Count == 0)
+                if (((ClassBase)element).ImplementedInterfaces.Count == 0)
                 {
                     this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
                 }
-            }
-            else if (element.ElementType == ElementType.Struct)
-            {
-                this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
             }
             else
             {
                 // Find the parent class.
                 ClassBase parentClass = element.Parent as ClassBase;
-                if (parentClass == null || parentClass.ElementType != ElementType.Class || string.IsNullOrEmpty(parentClass.BaseClass))
+                if (parentClass == null ||
+                    ((parentClass.ElementType == ElementType.Class && (string.IsNullOrEmpty(parentClass.BaseClass) && parentClass.ImplementedInterfaces.Count == 0)) ||
+                    ((parentClass.ElementType == ElementType.Interface || parentClass.ElementType == ElementType.Struct) && parentClass.ImplementedInterfaces.Count == 0)))
                 {
                     this.AddViolation(element, Rules.InheritDocMustBeUsedWithInheritingClass);
                 }
